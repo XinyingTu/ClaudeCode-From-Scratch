@@ -1,13 +1,8 @@
 # mini-claude-code
 
-A simplified educational coding agent inspired by Claude Code.
-
 This project is not a reimplementation of Claude Code.
 
 It is a learning journey to understand how modern coding agents are designed. Every module is built from first principles, documented with Architecture Decision Records (ADRs), and only then compared with production systems such as Claude Code and CoreCoder.
-
-Built as a learning project to understand how AI coding agents work from the inside:
-how they manage context, call tools, and iterate toward a solution.
 
 ## Goals
 
