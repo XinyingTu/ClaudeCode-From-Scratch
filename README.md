@@ -1,58 +1,60 @@
-# mini-claude-code
+# Mini Claude Code
 
-This project is not a reimplementation of Claude Code.
+> Reverse Engineering Claude Code Through First Principles
 
-It is a learning journey to understand how modern coding agents are designed. Every module is built from first principles, documented with Architecture Decision Records (ADRs), and only then compared with production systems such as Claude Code and CoreCoder.
+## Overview
 
-## Goals
+This project is an educational implementation of a modern coding agent inspired by Claude Code.
 
-- Readable over clever — every module should be understandable by a beginner
-- Build bottom-up: tools first, agent loop second, LLM integration last
-- Each new module ships with tests before moving on
+The goal is **not** to clone Claude Code feature by feature, but to understand **why** its architecture is designed the way it is.
 
-## Project Structure
+Instead of copying existing implementations, each module is derived from first principles:
 
-```
-src/
-  main.py            Entry point — parses args, starts a session
-  agent_loop.py      The core loop: pick a tool, run it, repeat
-  llm_client.py      Thin wrapper around the LLM API
-  context.py         Manages the conversation context window
-  session.py         Holds state for a single agent run
-  prompts.py         System prompt and prompt templates
+* What problem does this module solve?
+* What alternative designs exist?
+* What are the engineering trade-offs?
+* Why do production coding agents converge on similar architectures?
 
-  tools/
-    __init__.py      Tool registry
-    base.py          Base class all tools inherit from
-    file_tools.py    Read, write, and list files
-    search_tools.py  Grep and find-files
-    command_tools.py Run shell commands safely
+Only after making our own design decisions do we compare them with systems such as Claude Code and CoreCoder to validate our reasoning.
 
-tests/
-  test_file_tools.py
-  test_agent_loop.py
+## Learning Philosophy
 
-examples/
-  sample_project/    A small dummy codebase for the agent to work on
+This project follows an engineering-first learning approach.
 
-outputs/             Agent-generated files (not committed by default)
-```
+Every major feature is developed through the following process:
 
-## Development Order
+1. Define the problem.
+2. Explore multiple design options.
+3. Analyze engineering trade-offs.
+4. Record the architecture decision (ADR).
+5. Implement the solution.
+6. Compare with production coding agents.
 
-1. Implement and test `tools/base.py`
-2. Implement and test `tools/file_tools.py`
-3. Implement and test `tools/search_tools.py`
-4. Implement and test `tools/command_tools.py`
-5. Implement `context.py` and `session.py`
-6. Implement `agent_loop.py` with a mock LLM
-7. Wire up `llm_client.py` with a real API
+The objective is not only to build a coding agent, but also to develop the reasoning process of an AI Agent Engineer.
 
-## Getting Started
+## Project Goals
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt   # (coming soon)
-python src/main.py
-```
+By the end of this project, the agent will include:
+
+* Tool Layer
+* Agent Loop
+* Context Management
+* Tool Registry
+* Planning
+* Session Management
+* Reflection & Recovery
+* CLI Interface
+
+Each module is intentionally implemented from scratch to understand the design principles behind modern coding agents.
+
+## Documentation
+
+This repository includes Architecture Decision Records (ADRs) documenting every major design decision throughout the project.
+
+The ADRs focus on **why** a design was chosen rather than simply describing **how** it was implemented.
+
+## Acknowledgements
+
+This project is inspired by Claude Code and other modern coding agents.
+
+The purpose is educational: to study, understand, and reconstruct the architectural ideas behind production systems through independent implementation and analysis.
