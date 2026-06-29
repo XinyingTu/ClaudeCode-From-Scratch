@@ -111,10 +111,3 @@ Accepted because the project is intended to evolve into a multi-tool coding agen
 * Dependency Injection
 * Testability
 
----
-
-## Reverse Engineering Notes
-
-This design was derived through first-principles reasoning before comparing it with Claude Code.
-
-The goal of this project is not to clone Claude Code, but to understand why this architecture naturally emerges when building a scalable coding agent.
