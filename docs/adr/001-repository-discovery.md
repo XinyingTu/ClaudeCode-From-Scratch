@@ -1,37 +1,67 @@
-# ADR-001 Repository Discovery
+# ADR-001: Repository Discovery
+
+## Status
+
+Accepted
+
+---
+
+## Context
+
+A coding agent often needs to understand an unfamiliar codebase before solving a task.
+
+One possible approach is to load the entire repository into the LLM at once. While simple, this quickly exceeds the available context window and increases token usage as repositories grow.
+
+The agent therefore needs a strategy for discovering only the information required to make the next decision.
+
+---
 
 ## Decision
 
-Repository exploration should be incremental instead of exhaustive.
+Repository exploration should be **incremental rather than exhaustive**.
 
-## Reason
+Instead of loading every file into the LLM, the agent gathers only enough information to determine the next action. Additional files are explored only when new observations indicate they are relevant.
 
-The agent should gather only enough information to make the next decision, rather than loading the entire repository into the LLM.
+This allows the agent to progressively build an understanding of the repository while keeping the working context small.
 
-## Trade-off
+---
+
+## Trade-offs
 
 ### Pros
 
 * Lower token usage
-* Faster
-* Scalable
+* Scales to large repositories
+* Avoids unnecessary context
+* Naturally supports iterative reasoning
 
 ### Cons
 
-* Requires multiple iterations
-* More agent loop complexity
+* Requires multiple LLM iterations
+* Increases orchestration complexity
+* May require additional tool calls
+
+---
 
 ## Alternatives Considered
 
-### Option 1: Exhaustive Repository Scan
+### Option 1 — Exhaustive Repository Scan
 
-Rejected because it increases token usage and does not scale.
+Load the entire repository before reasoning.
 
-### Option 2: Incremental Repository Discovery
+Rejected because it consumes excessive context, increases token usage, and does not scale to real-world repositories.
 
-Accepted because the agent only needs enough context to make the next decision.
+### Option 2 — Incremental Repository Discovery
 
-## Future Considerations
+Explore the repository step by step based on the current objective.
 
-If repository summarization or caching is introduced in the future,
-this decision may be revisited.
+Accepted because the agent only needs enough information to make the next decision, allowing it to reason efficiently while continuously incorporating new observations.
+
+---
+
+## Key Principles
+
+* Incremental Reasoning
+* Context Engineering
+* Cost-Aware Design
+* Scalability
