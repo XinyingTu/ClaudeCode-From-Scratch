@@ -1,6 +1,171 @@
-# Tests for src/agent_loop.py
+# Tests for AgentLoop in src/agent_loop.py
 #
-# Focus on the loop's control flow:
-#   - Does it call the right tool given a mocked LLM response?
-#   - Does it stop when the task is marked done?
-#   - Does it handle tool errors gracefully?
+# We use three fakes to avoid real LLM calls:
+#   FakeLLM     — returns a pre-scripted sequence of responses
+#   FakeContext — records everything passed to add_tool_result
+#   inline tool stubs built with BaseTool
+
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from agent_loop import AgentLoop
+from tools.base import BaseTool
+from tools.registry import ToolRegistry
+
+
+# ---------------------------------------------------------------------------
+# Fakes
+# ---------------------------------------------------------------------------
+
+class FakeLLM:
+    """Returns responses from a fixed list, one per call to next()."""
+
+    def __init__(self, responses: list[dict]):
+        self._responses = list(responses)
+        self._index = 0
+
+    def next(self, context):
+        if self._index >= len(self._responses):
+            raise RuntimeError("FakeLLM ran out of scripted responses")
+        response = self._responses[self._index]
+        self._index += 1
+        return response
+
+
+class FakeContext:
+    """Minimal context stub; records tool results for inspection."""
+
+    def __init__(self):
+        self.tool_results: list[tuple[str, str]] = []
+
+    def add_tool_result(self, tool_name: str, result: str) -> None:
+        self.tool_results.append((tool_name, result))
+
+
+# A simple tool that returns a fixed string.
+class GreetTool(BaseTool):
+    name = "greet"
+    description = "Says hello."
+
+    def run(self, name: str = "world") -> str:
+        return f"Hello, {name}!"
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def make_registry(*tools) -> ToolRegistry:
+    registry = ToolRegistry()
+    for tool in tools:
+        registry.register(tool)
+    return registry
+
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+def test_final_answer_returned_immediately():
+    """A single 'final_answer' response ends the loop right away."""
+    llm = FakeLLM([
+        {"type": "final_answer", "content": "Done!"},
+    ])
+    loop = AgentLoop(llm, make_registry(), FakeContext())
+    assert loop.run() == "Done!"
+
+
+def test_tool_call_then_final_answer():
+    """One tool call followed by a final answer completes successfully."""
+    llm = FakeLLM([
+        {"type": "tool_call", "tool": "greet", "arguments": {"name": "Alice"}},
+        {"type": "final_answer", "content": "Said hello."},
+    ])
+    ctx = FakeContext()
+    loop = AgentLoop(llm, make_registry(GreetTool()), ctx)
+    result = loop.run()
+
+    assert result == "Said hello."
+    # The tool result should have been stored in context.
+    assert ctx.tool_results == [("greet", "Hello, Alice!")]
+
+
+def test_multiple_tool_calls_before_final_answer():
+    """The loop handles several consecutive tool calls correctly."""
+    llm = FakeLLM([
+        {"type": "tool_call", "tool": "greet", "arguments": {"name": "Bob"}},
+        {"type": "tool_call", "tool": "greet", "arguments": {"name": "Carol"}},
+        {"type": "final_answer", "content": "All done."},
+    ])
+    ctx = FakeContext()
+    loop = AgentLoop(llm, make_registry(GreetTool()), ctx)
+    assert loop.run() == "All done."
+    assert len(ctx.tool_results) == 2
+
+
+def test_tool_result_stored_in_context():
+    """The exact tool output is what gets stored in context."""
+    llm = FakeLLM([
+        {"type": "tool_call", "tool": "greet", "arguments": {"name": "Dev"}},
+        {"type": "final_answer", "content": "ok"},
+    ])
+    ctx = FakeContext()
+    loop = AgentLoop(llm, make_registry(GreetTool()), ctx)
+    loop.run()
+    assert ctx.tool_results[0] == ("greet", "Hello, Dev!")
+
+
+def test_max_steps_raises_runtime_error():
+    """If the LLM never returns a final_answer, RuntimeError is raised."""
+    # Always return a tool call — the loop will never finish on its own.
+    responses = [
+        {"type": "tool_call", "tool": "greet", "arguments": {}}
+    ] * 50  # more than max_steps
+    llm = FakeLLM(responses)
+    loop = AgentLoop(llm, make_registry(GreetTool()), FakeContext(), max_steps=3)
+    with pytest.raises(RuntimeError, match="max_steps"):
+        loop.run()
+
+
+def test_unknown_tool_raises_key_error():
+    """Calling a tool that isn't registered propagates KeyError."""
+    llm = FakeLLM([
+        {"type": "tool_call", "tool": "no_such_tool", "arguments": {}},
+    ])
+    loop = AgentLoop(llm, make_registry(), FakeContext())
+    with pytest.raises(KeyError):
+        loop.run()
+
+
+def test_unknown_response_type_raises_value_error():
+    """An unrecognised response type raises ValueError."""
+    llm = FakeLLM([
+        {"type": "something_weird"},
+    ])
+    loop = AgentLoop(llm, make_registry(), FakeContext())
+    with pytest.raises(ValueError, match="Unknown response type"):
+        loop.run()
+
+
+def test_tool_registry_injected_not_created_internally():
+    """AgentLoop must accept the registry from outside, not create one."""
+    registry = make_registry(GreetTool())
+    llm = FakeLLM([{"type": "final_answer", "content": "hi"}])
+    loop = AgentLoop(llm, registry, FakeContext())
+    # The registry passed in must be the exact same object.
+    assert loop.registry is registry
+
+
+def test_tool_arguments_default_to_empty_dict():
+    """A tool_call with no 'arguments' key should not crash."""
+    llm = FakeLLM([
+        {"type": "tool_call", "tool": "greet"},  # no 'arguments' key
+        {"type": "final_answer", "content": "ok"},
+    ])
+    loop = AgentLoop(llm, make_registry(GreetTool()), FakeContext())
+    # GreetTool.run() defaults name to "world", so this should work fine.
+    assert loop.run() == "ok"

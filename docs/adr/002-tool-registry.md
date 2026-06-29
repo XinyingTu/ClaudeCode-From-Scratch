@@ -4,89 +4,117 @@
 
 Accepted
 
+---
+
 ## Context
 
-Our Mini Claude Code agent needs to use multiple tools, such as `list_files`, and later `read_file`, `edit_file`, and `run_tests`.
+Our Mini Claude Code agent will gradually support multiple tools such as `list_files`, `read_file`, `edit_file`, and `run_tests`.
 
-A simple implementation could hardcode tool calls inside the agent loop:
+A straightforward implementation is to hardcode tool dispatch inside the agent loop:
 
 ```text
 if tool_name == "list_files":
-    call list_files
+    list_files(...)
 elif tool_name == "read_file":
-    call read_file
+    read_file(...)
 ```
 
-However, this design makes the agent loop tightly coupled to every concrete tool. As the number of tools grows, the agent loop becomes harder to maintain, test, and extend.
+Although simple initially, this approach tightly couples the agent loop to every concrete tool. As the number of tools grows, the orchestration logic becomes harder to maintain, test, and extend.
 
-The agent loop should focus on coordinating the reasoning cycle:
+The responsibility of the agent loop is to coordinate the reasoning cycle:
 
 ```text
 Think → Act → Observe
 ```
 
-It should not be responsible for knowing how every individual tool is implemented.
+It should decide **when** to invoke a tool, not **how** every tool is implemented.
+
+---
 
 ## Decision
 
-We will introduce a `ToolRegistry`.
+Introduce a **Tool Registry** as an independent architectural component.
 
-The `ToolRegistry` is responsible for:
+The Tool Registry is responsible for:
 
-* registering tools
+* registering tool instances
 * storing tool metadata
 * looking up tools by name
-* invoking the correct tool through a common interface
+* invoking the selected tool
 
-Each tool should expose at least:
+Each tool exposes a common interface:
 
 * `name`
 * `description`
 * `run(...)`
 
-The agent loop will interact with tools only through the registry.
+Each tool is represented as an **object** rather than a standalone function, allowing it to encapsulate both behavior and runtime state.
 
-Conceptually:
+The agent loop communicates only with the Tool Registry.
 
 ```text
-Agent Loop → Tool Registry → Tool
+Agent Loop
+      ↓
+ Tool Registry
+      ↓
+ Tool Object
 ```
+
+The `ToolRegistry` is created outside the `AgentLoop` and injected into it, keeping orchestration independent from dependency creation.
+
+---
 
 ## Consequences
 
 ### Positive
 
-* The agent loop is decoupled from concrete tool implementations.
-* New tools can be added without modifying the agent loop.
-* Tool discovery becomes easier because tool metadata is stored in one place.
-* The system becomes easier to test because registry behavior can be tested separately.
+* Decouples the agent loop from concrete tool implementations.
+* New tools can be added without modifying orchestration logic.
+* Tool metadata is centralized for easier discovery.
+* Tool objects encapsulate both behavior and state.
+* Dependency Injection improves testability and flexibility.
 
 ### Negative
 
-* Adds one extra abstraction layer.
-* For a very small project with only one tool, this may feel unnecessary.
-* Tool interface design must be kept simple and consistent.
+* Introduces one additional abstraction layer.
+* Slightly increases complexity for very small projects.
+* Requires all tools to implement a consistent interface.
+
+---
 
 ## Alternatives Considered
 
-### Option 1: Hardcode tool calls in the agent loop
+### Option 1 — Hardcode tool dispatch
 
-This is simple at the beginning but does not scale well. Every new tool requires modifying the agent loop.
+Simple but tightly couples the agent loop with every tool.
 
-Rejected because it violates separation of concerns and makes the agent harder to extend.
+Rejected because it does not scale.
 
-### Option 2: Use a Tool Registry
+### Option 2 — Tool Registry
 
-This adds a small abstraction but keeps the agent loop clean and extensible.
+Separates orchestration from tool management through a common interface.
 
-Accepted because Mini Claude Code is designed to grow into a multi-tool agent.
+Accepted because the project is intended to evolve into a multi-tool coding agent.
 
-## Architecture Principle
+---
 
-This decision follows:
+## Engineering Principles
+
+**Primary Goal**
+
+* Reduce Coupling
+
+**Supporting Principles**
 
 * Separation of Concerns
-* Decoupling
 * Open-Closed Principle
+* Dependency Injection
+* Testability
 
-The agent loop should be responsible for coordination, while the registry should be responsible for tool management.
+---
+
+## Reverse Engineering Notes
+
+This design was derived through first-principles reasoning before comparing it with Claude Code.
+
+The goal of this project is not to clone Claude Code, but to understand why this architecture naturally emerges when building a scalable coding agent.
