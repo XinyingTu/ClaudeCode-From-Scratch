@@ -65,3 +65,9 @@ Accepted because the agent only needs enough information to make the next decisi
 * Context Engineering
 * Cost-Aware Design
 * Scalability
+
+---
+
+## Next Challenge
+
+Incremental repository discovery reduces unnecessary context, but the agent still requires a mechanism for executing the actions it decides to take.
