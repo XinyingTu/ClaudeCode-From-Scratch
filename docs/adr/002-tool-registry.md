@@ -111,3 +111,10 @@ Accepted because the project is intended to evolve into a multi-tool coding agen
 * Dependency Injection
 * Testability
 
+---
+
+## Next Challenge
+
+The Tool Registry solves tool discovery and execution, but it does not explain how an agent coordinates repeated reasoning and tool use.
+
+The next architectural question is how to design an execution loop that repeatedly reasons, acts, and observes until the task is complete.
