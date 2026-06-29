@@ -73,3 +73,13 @@ Accepted because every observation expands the agent's understanding of the envi
 * Deterministic Control Flow
 * Dependency Injection
 * Testability
+
+---
+
+## Next Challenge
+
+An iterative Agent Loop continuously accumulates observations.
+
+Without careful context management, the growing context will increase computational cost and eventually exceed the model's context window.
+
+The next architectural question is how observations should be represented and managed efficiently.
