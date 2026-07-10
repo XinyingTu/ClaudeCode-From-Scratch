@@ -1,4 +1,4 @@
-# Mini Claude Code
+# ClaudeCode-From-Scratch
 
 > Reverse Engineering Claude Code Through First Principles
 
