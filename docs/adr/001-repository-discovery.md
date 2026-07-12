@@ -4,8 +4,6 @@
 
 Accepted
 
----
-
 ## Context
 
 A coding agent often needs to understand an unfamiliar codebase before solving a task.
@@ -13,8 +11,6 @@ A coding agent often needs to understand an unfamiliar codebase before solving a
 One possible approach is to load the entire repository into the LLM at once. While simple, this quickly exceeds the available context window and increases token usage as repositories grow.
 
 The agent therefore needs a strategy for discovering only the information required to make the next decision.
-
----
 
 ## Decision
 
@@ -24,24 +20,20 @@ Instead of loading every file into the LLM, the agent gathers only enough inform
 
 This allows the agent to progressively build an understanding of the repository while keeping the working context small.
 
----
-
 ## Trade-offs
 
 ### Pros
 
-* Lower token usage
-* Scales to large repositories
-* Avoids unnecessary context
-* Naturally supports iterative reasoning
+- Lower token usage
+- Scales to large repositories
+- Avoids unnecessary context
+- Naturally supports iterative reasoning
 
 ### Cons
 
-* Requires multiple LLM iterations
-* Increases orchestration complexity
-* May require additional tool calls
-
----
+- Requires multiple LLM iterations
+- Increases orchestration complexity
+- May require additional tool calls
 
 ## Alternatives Considered
 
@@ -57,17 +49,12 @@ Explore the repository step by step based on the current objective.
 
 Accepted because the agent only needs enough information to make the next decision, allowing it to reason efficiently while continuously incorporating new observations.
 
----
+## First Principles
 
-## Key Principles
+**Minimize Information** (incremental discovery, context engineering, YAGNI, cost-aware design)
 
-* Incremental Reasoning
-* Context Engineering
-* Cost-Aware Design
-* Scalability
-
----
+Acquire, process, and retain only the minimum sufficient information required for the next decision. Loading a full repository violates this principle; incremental discovery satisfies it.
 
 ## Next Challenge
 
-Incremental repository discovery reduces unnecessary context, but the agent still requires a mechanism for executing the actions it decides to take.
+Incremental repository discovery requires the agent to perform actions such as listing and reading files. The next challenge is supporting multiple tools without coupling the Agent Loop to every concrete tool.
