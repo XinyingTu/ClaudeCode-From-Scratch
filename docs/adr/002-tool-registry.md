@@ -78,6 +78,10 @@ The Agent Loop is responsible for orchestration only. Tool management is delegat
 
 The Agent Loop depends on the Tool Registry interface, not on any concrete tool. The registry is injected at construction time.
 
-## Next Challenge
+## Reverse Engineering Notes
 
 The Tool Registry separates tool management from orchestration, but the system still needs a mechanism for repeatedly reasoning, acting, and observing until a task is complete.
+
+This design was derived through first-principles reasoning before comparing it with Claude Code.
+
+The goal of this project is not to clone Claude Code, but to understand why this architecture naturally emerges when building a scalable coding agent.

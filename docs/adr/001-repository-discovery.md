@@ -14,11 +14,11 @@ The agent therefore needs a strategy for discovering only the information requir
 
 ## Decision
 
-Repository exploration should be **incremental rather than exhaustive**.
+Repository exploration should be incremental instead of exhaustive.
 
-Instead of loading every file into the LLM, the agent gathers only enough information to determine the next action. Additional files are explored only when new observations indicate they are relevant.
+## Reason
 
-This allows the agent to progressively build an understanding of the repository while keeping the working context small.
+The agent should gather only enough information to make the next decision, rather than loading the entire repository into the LLM.
 
 ## Trade-offs
 
@@ -37,17 +37,15 @@ This allows the agent to progressively build an understanding of the repository 
 
 ## Alternatives Considered
 
-### Option 1 — Exhaustive Repository Scan
+### Option 1: Exhaustive Repository Scan
 
-Load the entire repository before reasoning.
+Rejected because it increases token usage and does not scale.
 
-Rejected because it consumes excessive context, increases token usage, and does not scale to real-world repositories.
+### Option 2: Incremental Repository Discovery
 
-### Option 2 — Incremental Repository Discovery
+Accepted because the agent only needs enough context to make the next decision.
 
-Explore the repository step by step based on the current objective.
-
-Accepted because the agent only needs enough information to make the next decision, allowing it to reason efficiently while continuously incorporating new observations.
+## Future Considerations
 
 ## First Principles
 
@@ -58,3 +56,5 @@ Acquire, process, and retain only the minimum sufficient information required fo
 ## Next Challenge
 
 Incremental repository discovery requires the agent to perform actions such as listing and reading files. The next challenge is supporting multiple tools without coupling the Agent Loop to every concrete tool.
+
+If repository summarization or caching is introduced in the future, this decision may be revisited.
