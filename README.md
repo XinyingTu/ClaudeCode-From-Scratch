@@ -43,27 +43,26 @@ graph TD
 
 ```mermaid
 flowchart TD
-    UR[User Request] --> CT[Create Task Context]
-    CT --> Loop[Agent Loop]
-    Loop --> BM["Context builds LLM input"]
-    BM --> LLM[LLM]
-    LLM --> SR[Structured Response]
-    SR --> Decision{Tool Call or Final Answer?}
+    UR[User] --> CTX[Context]
+    CTX --> Loop[Agent Loop]
+    Loop --> AC["AnthropicClient.next(context)"]
+    AC --> Claude[Claude]
+    Claude --> SR["FinalAnswer or ToolCall"]
 
-    Decision -->|Tool Call| TReg[Tool Registry]
-    TReg --> TE[Tool Execution]
-    TE --> Obs[Observation]
-    Obs --> UC[Update Context]
-    UC --> Loop
+    SR -->|ToolCall| TReg[Tool Registry]
+    TReg --> T[Tool]
+    T --> Obs[Observation]
+    Obs --> CTX
 
-    Decision -->|Final Answer| End[End Task]
+    SR -->|FinalAnswer| End[Return to User]
 ```
 
 - One user request is treated as one task in v1.
-- One task owns one Context.
-- Multiple loop iterations update the same Context.
-- Context represents the working state of the current task.
-- `build_messages()` assembles that working state into input the LLM can consume.
+- One task owns one `Context`.
+- `AgentLoop.run()` repeatedly calls `AnthropicClient.next(context)` until it gets back a `FinalAnswer`.
+- `next()` translates Claude's raw response into the internal protocol (`FinalAnswer` / `ToolCall`) defined in ADR-005 — the loop never sees a provider-specific shape.
+- A `ToolCall` carries a `call_id`; `Context.add_tool_result()` stores the tool's output keyed to that `call_id` so it can be replayed as a paired `tool_use`/`tool_result` on the next round.
+- `Context.build_messages()` assembles the running conversation (including past tool results) into the input Claude sees next.
 
 ## First Principles Map
 
@@ -111,6 +110,8 @@ src/
 | [ADR-001](docs/adr/001-repository-discovery.md) | Repository Discovery | Accepted |
 | [ADR-002](docs/adr/002-tool-registry.md) | Tool Registry | Accepted |
 | [ADR-003](docs/adr/003-agent-loop.md) | Agent Loop | Accepted |
+| [ADR-004](docs/adr/004-context.md) | Context | Accepted |
+| [ADR-005](docs/adr/005-internal-communication-protocol.md) | Internal Communication Protocol | Accepted |
 
 ## Roadmap
 
@@ -119,23 +120,25 @@ src/
 - [x] Repository Discovery
 - [x] Tool Registry
 - [x] Agent Loop
-- [ ] Context — *next*
-- [ ] Structured Protocol
+- [x] Context
+- [x] Structured Protocol (ADR-005 — `FinalAnswer` / `ToolCall`)
 
 ### Phase 2 — Coding Runtime
 
-- [ ] read_file
-- [ ] write_file
-- [ ] edit_file
+- [x] Real LLM client (`AnthropicClient`, wired into `AgentLoop`)
+- [x] Tool schema exposed to Claude
+- [x] `list_files` — first real tool-use loop, end to end
+- [ ] `read_file` — *next*
+- [ ] `edit_file`
+- [ ] `run_tests`
 - [ ] grep
 - [ ] glob
 - [ ] bash
 - [ ] Tool errors returned as observations
-- [ ] read → edit → test → retry workflow
+- [ ] read → edit → test → retry workflow — *next milestone: a real multi-tool coding session*
 
 ### Phase 3 — Product and Reliability
 
-- [ ] Real LLM client
 - [ ] System prompt
 - [ ] CLI / REPL
 - [ ] Configuration
@@ -149,4 +152,8 @@ Advanced planning, reflection, sub-agents, and parallel tool execution are optio
 
 ## Current Status
 
-Phase 1 in progress. Repository Discovery, Tool Registry, and Agent Loop are complete. Context and Structured Protocol are next.
+Phase 1 (Agent Kernel) is complete: Repository Discovery, Tool Registry, Agent Loop, Context, and the ADR-005 typed internal protocol are all implemented.
+
+Phase 2 (Coding Runtime) is underway. A real `AnthropicClient` is wired into `AgentLoop`, the tool schema is exposed to Claude, and `list_files` runs as a full tool-use loop end to end: Claude issues a `ToolCall` (with a `call_id`), the `ToolRegistry` executes it, and the result is stored in `Context` and replayed on the next round.
+
+44/44 tests pass. `read_file`, `edit_file`, and `run_tests` are the next capabilities, aimed at a real read → edit → test coding workflow.
