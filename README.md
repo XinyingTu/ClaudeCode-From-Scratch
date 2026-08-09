@@ -115,38 +115,58 @@ src/
 
 ## Roadmap
 
-### Phase 1 — Agent Kernel
+ClaudeCode-From-Scratch
 
-- [x] Repository Discovery
-- [x] Tool Registry
-- [x] Agent Loop
-- [x] Context
-- [x] Structured Protocol (ADR-005 — `FinalAnswer` / `ToolCall`)
+Phase 1 — Agent Kernel
+├── Repository Discovery ✅
+├── Tool Registry ✅
+├── Agent Loop ✅
+├── Context ✅
+└── Internal Protocol ✅
 
-### Phase 2 — Coding Runtime
+Phase 2 — Coding Runtime
+├── Real LLM Client ✅
+├── Tool Schema ✅
+├── list_files ✅
+├── read_file
+├── edit_file
+├── run_tests
+├── grep / glob / bash
+├── Tool errors as observations
+└── read → edit → test → retry
 
-- [x] Real LLM client (`AnthropicClient`, wired into `AgentLoop`)
-- [x] Tool schema exposed to Claude
-- [x] `list_files` — first real tool-use loop, end to end
-- [ ] `read_file` — *next*
-- [ ] `edit_file`
-- [ ] `run_tests`
-- [ ] grep
-- [ ] glob
-- [ ] bash
-- [ ] Tool errors returned as observations
-- [ ] read → edit → test → retry workflow — *next milestone: a real multi-tool coding session*
+Phase 3 — Product Layer
+├── System Prompt
+├── CLI / REPL
+├── Configuration
+├── Session save / resume
+├── Permission / confirmation
+└── End-to-end coding demo
 
-### Phase 3 — Product and Reliability
+Phase 4 — Memory & Context Intelligence
+├── Context compaction
+├── Task summary
+├── Repository memory
+├── Session memory
+├── Memory retrieval
+├── Memory scope / lifecycle
+└── Context vs Memory policy
 
-- [ ] System prompt
-- [ ] CLI / REPL
-- [ ] Configuration
-- [ ] Session save and resume
-- [ ] Basic context compaction
-- [ ] Safety confirmation for risky actions
-- [ ] End-to-end demo
-- [ ] README polish
+Phase 5 — Evaluation & Production Reliability
+├── Eval dataset / benchmark
+├── Task success rate
+├── Test pass rate
+├── Tool-call efficiency
+├── Latency / token / cost metrics
+├── Regression eval
+├── Failure taxonomy
+├── LLM-as-a-Judge where needed
+├── Tracing / observability
+├── Structured logging
+├── Retry / timeout / rate limits
+├── Error handling
+├── CI eval pipeline
+└── Production deployment
 
 Advanced planning, reflection, sub-agents, and parallel tool execution are optional extensions, not baseline requirements.
 
