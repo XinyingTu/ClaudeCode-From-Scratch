@@ -13,6 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from agent_loop import AgentLoop
+from protocol import FinalAnswer, ToolCall
 from tools.base import BaseTool
 from tools.registry import ToolRegistry
 
@@ -24,7 +25,7 @@ from tools.registry import ToolRegistry
 class FakeLLM:
     """Returns responses from a fixed list, one per call to next()."""
 
-    def __init__(self, responses: list[dict]):
+    def __init__(self, responses: list):
         self._responses = list(responses)
         self._index = 0
 
@@ -71,9 +72,9 @@ def make_registry(*tools) -> ToolRegistry:
 # ---------------------------------------------------------------------------
 
 def test_final_answer_returned_immediately():
-    """A single 'final_answer' response ends the loop right away."""
+    """A single FinalAnswer response ends the loop right away."""
     llm = FakeLLM([
-        {"type": "final_answer", "content": "Done!"},
+        FinalAnswer(content="Done!"),
     ])
     loop = AgentLoop(llm, make_registry(), FakeContext())
     assert loop.run() == "Done!"
@@ -82,8 +83,8 @@ def test_final_answer_returned_immediately():
 def test_tool_call_then_final_answer():
     """One tool call followed by a final answer completes successfully."""
     llm = FakeLLM([
-        {"type": "tool_call", "tool": "greet", "arguments": {"name": "Alice"}},
-        {"type": "final_answer", "content": "Said hello."},
+        ToolCall(tool="greet", arguments={"name": "Alice"}),
+        FinalAnswer(content="Said hello."),
     ])
     ctx = FakeContext()
     loop = AgentLoop(llm, make_registry(GreetTool()), ctx)
@@ -97,9 +98,9 @@ def test_tool_call_then_final_answer():
 def test_multiple_tool_calls_before_final_answer():
     """The loop handles several consecutive tool calls correctly."""
     llm = FakeLLM([
-        {"type": "tool_call", "tool": "greet", "arguments": {"name": "Bob"}},
-        {"type": "tool_call", "tool": "greet", "arguments": {"name": "Carol"}},
-        {"type": "final_answer", "content": "All done."},
+        ToolCall(tool="greet", arguments={"name": "Bob"}),
+        ToolCall(tool="greet", arguments={"name": "Carol"}),
+        FinalAnswer(content="All done."),
     ])
     ctx = FakeContext()
     loop = AgentLoop(llm, make_registry(GreetTool()), ctx)
@@ -110,8 +111,8 @@ def test_multiple_tool_calls_before_final_answer():
 def test_tool_result_stored_in_context():
     """The exact tool output is what gets stored in context."""
     llm = FakeLLM([
-        {"type": "tool_call", "tool": "greet", "arguments": {"name": "Dev"}},
-        {"type": "final_answer", "content": "ok"},
+        ToolCall(tool="greet", arguments={"name": "Dev"}),
+        FinalAnswer(content="ok"),
     ])
     ctx = FakeContext()
     loop = AgentLoop(llm, make_registry(GreetTool()), ctx)
@@ -120,10 +121,10 @@ def test_tool_result_stored_in_context():
 
 
 def test_max_steps_raises_runtime_error():
-    """If the LLM never returns a final_answer, RuntimeError is raised."""
+    """If the LLM never returns a FinalAnswer, RuntimeError is raised."""
     # Always return a tool call — the loop will never finish on its own.
     responses = [
-        {"type": "tool_call", "tool": "greet", "arguments": {}}
+        ToolCall(tool="greet", arguments={})
     ] * 50  # more than max_steps
     llm = FakeLLM(responses)
     loop = AgentLoop(llm, make_registry(GreetTool()), FakeContext(), max_steps=3)
@@ -134,7 +135,7 @@ def test_max_steps_raises_runtime_error():
 def test_unknown_tool_raises_key_error():
     """Calling a tool that isn't registered propagates KeyError."""
     llm = FakeLLM([
-        {"type": "tool_call", "tool": "no_such_tool", "arguments": {}},
+        ToolCall(tool="no_such_tool", arguments={}),
     ])
     loop = AgentLoop(llm, make_registry(), FakeContext())
     with pytest.raises(KeyError):
@@ -142,9 +143,9 @@ def test_unknown_tool_raises_key_error():
 
 
 def test_unknown_response_type_raises_value_error():
-    """An unrecognised response type raises ValueError."""
+    """A response that isn't FinalAnswer or ToolCall raises ValueError."""
     llm = FakeLLM([
-        {"type": "something_weird"},
+        "something_weird",
     ])
     loop = AgentLoop(llm, make_registry(), FakeContext())
     with pytest.raises(ValueError, match="Unknown response type"):
@@ -154,17 +155,17 @@ def test_unknown_response_type_raises_value_error():
 def test_tool_registry_injected_not_created_internally():
     """AgentLoop must accept the registry from outside, not create one."""
     registry = make_registry(GreetTool())
-    llm = FakeLLM([{"type": "final_answer", "content": "hi"}])
+    llm = FakeLLM([FinalAnswer(content="hi")])
     loop = AgentLoop(llm, registry, FakeContext())
     # The registry passed in must be the exact same object.
     assert loop.registry is registry
 
 
 def test_tool_arguments_default_to_empty_dict():
-    """A tool_call with no 'arguments' key should not crash."""
+    """A ToolCall with no explicit arguments should not crash."""
     llm = FakeLLM([
-        {"type": "tool_call", "tool": "greet"},  # no 'arguments' key
-        {"type": "final_answer", "content": "ok"},
+        ToolCall(tool="greet"),  # arguments defaults to {}
+        FinalAnswer(content="ok"),
     ])
     loop = AgentLoop(llm, make_registry(GreetTool()), FakeContext())
     # GreetTool.run() defaults name to "world", so this should work fine.

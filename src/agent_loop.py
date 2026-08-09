@@ -3,6 +3,13 @@
 # Drives the agent until the LLM either produces a final answer or the
 # step limit is reached.  The loop itself has no knowledge of how tools
 # are implemented — it delegates entirely to the registry.
+#
+# The loop only understands the internal protocol defined in ADR-005
+# (FinalAnswer / ToolCall). It never inspects a provider's raw response —
+# that translation happens inside the LLM adapter (e.g. AnthropicClient).
+
+from protocol import FinalAnswer, ToolCall
+
 
 class AgentLoop:
     # Stop after this many steps to prevent runaway loops.
@@ -25,28 +32,23 @@ class AgentLoop:
         for step in range(self.max_steps):
             response = self.llm.next(self.context)
 
-            response_type = response.get("type")
+            if isinstance(response, FinalAnswer):
+                return response.content
 
-            if response_type == "final_answer":
-                return response["content"]
-
-            if response_type == "tool_call":
-                tool_name = response["tool"]
-                arguments = response.get("arguments", {})
-
+            if isinstance(response, ToolCall):
                 # Execute the tool and capture its output.
                 # We call get_tool().run() directly instead of run_tool() so
                 # that argument keys in `arguments` (e.g. "name") don't
                 # collide with run_tool()'s own `name` parameter.
-                tool = self.registry.get_tool(tool_name)
-                result = tool.run(**arguments)
+                tool = self.registry.get_tool(response.tool)
+                result = tool.run(**response.arguments)
 
                 # Hand the result back to the context so the LLM can see it
                 # on the next turn.
-                self.context.add_tool_result(tool_name, result)
+                self.context.add_tool_result(response.tool, result)
 
             else:
-                raise ValueError(f"Unknown response type: {response_type!r}")
+                raise ValueError(f"Unknown response type: {type(response).__name__!r}")
 
         raise RuntimeError(
             f"AgentLoop reached max_steps ({self.max_steps}) without a final answer."

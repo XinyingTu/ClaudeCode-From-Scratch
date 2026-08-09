@@ -144,8 +144,58 @@ Our Mini Claude Code derives the architecture from first principles and therefor
 
 ---
 
+## Implementation Status
+
+ADR-005 is now implemented in code (Sprint 1.5).
+
+1. `src/protocol.py` defines the internal typed protocol described above:
+   `FinalAnswer` and `ToolCall`, as plain frozen dataclasses.
+
+2. `AgentLoop` no longer inspects provider-style raw dict responses
+   (e.g. `response.get("type")`, `response["content"]`). It depends only
+   on the internal protocol, branching on `isinstance(response, FinalAnswer)`
+   / `isinstance(response, ToolCall)`.
+
+3. `FakeLLM` and the AgentLoop test suite were migrated to construct and
+   return `FinalAnswer` / `ToolCall` instances instead of dicts, preserving
+   all previously verified behavior.
+
+4. `AnthropicClient` currently acts as the provider boundary described in
+   Option 3 / "Hide Change" above: it receives Anthropic SDK responses and
+   translates them into the internal protocol through its `next(context)`
+   method, so the translation adapter lives entirely at the edge.
+
+5. The real-Claude `FinalAnswer` path now runs end-to-end:
+
+   ```
+   Context
+     → AgentLoop
+       → AnthropicClient.next()
+         → Anthropic SDK
+           → Claude API
+         → translated back into FinalAnswer
+       → AgentLoop returns FinalAnswer.content
+   ```
+
+6. `ToolCall` is part of the internal protocol and is consumed by
+   `AgentLoop`, but `AnthropicClient.next()` cannot yet produce one —
+   real Anthropic tool-use translation is intentionally deferred to a
+   later sprint. `AnthropicClient` is therefore a partial adapter today:
+   correct for the shape it implements, incomplete for the protocol it
+   depends on.
+
+7. `Context.build_messages()` is sufficient for the current text-only,
+   no-tool-calls request shape. It has not yet been exercised against
+   real tool results, so it does not yet address how tool results should
+   be represented in Anthropic's native message format (e.g. `tool_result`
+   content blocks) versus the flattened string it produces today.
+
+---
+
 ## Next Challenge
 
-The communication contract has now been defined.
-
-The next challenge is implementing the protocol objects and integrating them into the Agent Loop without exposing provider-specific communication details to the orchestration layer.
+The FinalAnswer path is implemented end-to-end. The next challenge is
+extending `AnthropicClient` to translate Claude's real tool-use responses
+into `ToolCall`, and extending `Context.build_messages()` to represent
+tool results in the provider's native format on the request side — without
+leaking either shape into `AgentLoop`.
