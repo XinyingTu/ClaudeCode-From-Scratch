@@ -223,3 +223,39 @@ The next challenge, when it comes, is adding a second real tool
 (`read_file`) and seeing whether one `call_id`-keyed observation shape
 still holds, or whether provider-specific request assembly needs to move
 out of `Context` entirely.
+
+## Implementation Status (Sprint 3)
+
+A second and third real tool (`read_file`, `run_tests`) were added purely
+by registering two new `BaseTool` subclasses in `ToolRegistry`. The
+question posed above — whether the one `call_id`-keyed observation shape
+still holds — is answered: it does. No change was required to
+`protocol.py`, `agent_loop.py`, `context.py`, or `AnthropicClient.next()`.
+`AnthropicClient._tool_schemas()` already built its `tools` list from
+`tool_registry.list_tools()`, so a third registered tool is simply a third
+schema entry with no code change. `AgentLoop.run()` already dispatched by
+`registry.get_tool(response.tool).run(**response.arguments)`, so a third
+tool name is just another registry lookup. This confirms ADR-002's and
+ADR-003's predictions rather than revising them — see
+`tests/test_tool_use_loop_integration.py::test_full_loop_across_three_different_tools_before_final_answer`
+for the full three-tool, multi-round proof.
+
+One latent tension surfaced by having three tools instead of one:
+`AnthropicClient.next()` only reads the *first* `tool_use` block out of a
+response (`break` on the first match). Anthropic's API allows a single
+turn to request several tool calls at once, and with only one tool
+available that case was moot — Claude had nothing else to batch. With
+three tools it becomes a real possibility (e.g. reading two files in one
+turn), and today any block after the first would be silently dropped
+rather than executed or reported. This is not fixed here — the mission
+scope for this sprint is read-only, single-call-per-round tool use — but
+it is now a concrete, observable gap rather than a hypothetical one, and
+should be the next thing addressed if/when multi-tool-call turns are
+seen in practice.
+
+Separately, `ReadFileTool` and `RunTestsTool` each re-implement their own
+"stay inside `root`" path-containment check (see `src/tools/file_tools.py`
+and `src/tools/command_tools.py`). This duplication was left as-is rather
+than extracted into a shared helper on `BaseTool`, since two call sites
+don't yet justify a new abstraction — but a third repo-scoped tool should
+prompt revisiting this.

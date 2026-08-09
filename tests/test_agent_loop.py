@@ -16,7 +16,8 @@ from agent_loop import AgentLoop
 from context import Context
 from protocol import FinalAnswer, ToolCall
 from tools.base import BaseTool
-from tools.file_tools import ListFilesTool
+from tools.command_tools import RunTestsTool
+from tools.file_tools import ListFilesTool, ReadFileTool
 from tools.registry import ToolRegistry
 
 
@@ -215,3 +216,88 @@ def test_list_files_tool_call_becomes_observation_with_call_id(tmp_path):
     assert messages[1]["content"][0]["id"] == "toolu_repo_01"
     assert messages[2]["content"][0]["type"] == "tool_result"
     assert messages[2]["content"][0]["tool_use_id"] == "toolu_repo_01"
+
+
+# ---------------------------------------------------------------------------
+# Sprint 3: read_file / run_tests ToolCalls execute through the same
+# generic AgentLoop code path as list_files — no tool-specific branching.
+# ---------------------------------------------------------------------------
+
+def test_read_file_tool_call_becomes_observation_with_call_id(tmp_path):
+    """AgentLoop needs no read_file-specific code: registry lookup + run()
+    is enough, exactly like list_files."""
+    (tmp_path / "notes.txt").write_text("agent loop notes")
+
+    llm = FakeLLM([
+        ToolCall(
+            tool="read_file",
+            arguments={"path": "notes.txt"},
+            call_id="toolu_read_01",
+        ),
+        FinalAnswer(content="The file contains agent loop notes."),
+    ])
+    context = Context("What does notes.txt say?")
+    loop = AgentLoop(llm, make_registry(ReadFileTool(root=str(tmp_path))), context)
+
+    result = loop.run()
+
+    assert result == "The file contains agent loop notes."
+    assert len(context.observations) == 1
+    observation = context.observations[0]
+    assert observation["tool_name"] == "read_file"
+    assert observation["call_id"] == "toolu_read_01"
+    assert "agent loop notes" in observation["result"]
+
+
+def test_run_tests_tool_call_becomes_observation_with_call_id(tmp_path):
+    """Same generic path for run_tests."""
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_sample.py").write_text("def test_sample():\n    assert True\n")
+
+    llm = FakeLLM([
+        ToolCall(tool="run_tests", arguments={}, call_id="toolu_test_01"),
+        FinalAnswer(content="All tests passed."),
+    ])
+    context = Context("Do the tests pass?")
+    loop = AgentLoop(llm, make_registry(RunTestsTool(root=str(tmp_path))), context)
+
+    result = loop.run()
+
+    assert result == "All tests passed."
+    observation = context.observations[0]
+    assert observation["tool_name"] == "run_tests"
+    assert observation["call_id"] == "toolu_test_01"
+    assert "PASSED" in observation["result"]
+
+
+def test_multiple_different_tools_called_sequentially_before_final_answer(tmp_path):
+    """list_files -> read_file -> run_tests -> FinalAnswer, all through the
+    one generic AgentLoop.run() code path, with call_id pairing preserved
+    across every round."""
+    (tmp_path / "agent_loop.py").write_text("# fake agent loop source")
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_agent_loop.py").write_text("def test_x():\n    assert True\n")
+
+    llm = FakeLLM([
+        ToolCall(tool="list_files", arguments={"directory": str(tmp_path)}, call_id="c1"),
+        ToolCall(tool="read_file", arguments={"path": "agent_loop.py"}, call_id="c2"),
+        ToolCall(tool="run_tests", arguments={}, call_id="c3"),
+        FinalAnswer(content="Inspected the repo and its tests pass."),
+    ])
+    context = Context("Understand AgentLoop and verify its tests.")
+    registry = make_registry(
+        ListFilesTool(),
+        ReadFileTool(root=str(tmp_path)),
+        RunTestsTool(root=str(tmp_path)),
+    )
+    loop = AgentLoop(llm, registry, context)
+
+    result = loop.run()
+
+    assert result == "Inspected the repo and its tests pass."
+    tool_sequence = [obs["tool_name"] for obs in context.observations]
+    assert tool_sequence == ["list_files", "read_file", "run_tests"]
+    call_ids = [obs["call_id"] for obs in context.observations]
+    assert call_ids == ["c1", "c2", "c3"]

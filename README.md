@@ -136,8 +136,9 @@ claude-code-from-scratch
 
 - [x] Tool schemas exposed to Claude
 - [x] `list_files`
-- [ ] `read_file`
-- [ ] `run_tests`
+- [x] `read_file`
+- [x] `run_tests`
+- [x] Multi-tool autonomous reasoning — Claude chooses among `list_files` / `read_file` / `run_tests` and sequences multiple tool calls itself, in no fixed order
 - [ ] `edit_file`
 - [ ] `grep` / `glob`
 - [ ] Tool errors as observations
@@ -218,6 +219,6 @@ Advanced planning, reflection, sub-agents, and parallel tool execution are optio
 
 Phase 1 (Agent Kernel) is complete: Repository Discovery, Tool Registry, Agent Loop, Context, and the ADR-005 typed internal protocol are all implemented.
 
-Phase 2 (Coding Runtime) is underway. A real `AnthropicClient` is wired into `AgentLoop`, the tool schema is exposed to Claude, and `list_files` runs as a full tool-use loop end to end: Claude issues a `ToolCall` (with a `call_id`), the `ToolRegistry` executes it, and the result is stored in `Context` and replayed on the next round.
+Phase 2 (Coding Runtime) is underway. A real `AnthropicClient` is wired into `AgentLoop`, the tool schema is exposed to Claude, and `list_files`, `read_file`, and `run_tests` all run as a full tool-use loop end to end: Claude issues a `ToolCall` (with a `call_id`) for whichever tool it chooses, the `ToolRegistry` executes it, and the result is stored in `Context` and replayed on the next round. Claude autonomously sequences multiple different tool calls — in whatever order it decides — before producing a `FinalAnswer`; no sequence is hardcoded.
 
-44/44 tests pass. `read_file`, `edit_file`, and `run_tests` are the next capabilities, aimed at a real read → edit → test coding workflow.
+61/61 tests pass. `edit_file` is the next capability, aimed at a real read → edit → test coding workflow.

@@ -105,6 +105,37 @@ def test_next_sends_tool_schema_for_registered_tools():
     }]
 
 
+def test_next_sends_tool_schema_for_every_registered_tool():
+    """Registering read_file/run_tests alongside list_files must not require
+    any change here — AnthropicClient discovers schemas from the registry."""
+    from tools.command_tools import RunTestsTool
+    from tools.file_tools import ListFilesTool, ReadFileTool
+
+    registry = ToolRegistry()
+    registry.register(ListFilesTool())
+    registry.register(ReadFileTool())
+    registry.register(RunTestsTool())
+    client = make_client_with_mocked_api("ok", tool_registry=registry)
+
+    client.next(Context("anything"))
+
+    _, kwargs = client._client.messages.create.call_args
+    names = [schema["name"] for schema in kwargs["tools"]]
+    assert names == ["list_files", "read_file", "run_tests"]
+    # Every schema still carries the tool's own description/input_schema —
+    # nothing hardcoded per tool name in AnthropicClient.
+    assert kwargs["tools"][1] == {
+        "name": "read_file",
+        "description": ReadFileTool.description,
+        "input_schema": ReadFileTool.input_schema,
+    }
+    assert kwargs["tools"][2] == {
+        "name": "run_tests",
+        "description": RunTestsTool.description,
+        "input_schema": RunTestsTool.input_schema,
+    }
+
+
 def test_next_sends_empty_tools_list_when_registry_has_no_tools():
     client = make_client_with_mocked_api("ok")
     client.next(Context("anything"))

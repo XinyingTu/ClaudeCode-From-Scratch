@@ -19,7 +19,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from agent_loop import AgentLoop
 from context import Context
 from llm_client import AnthropicClient, DEFAULT_MODEL
-from tools.file_tools import ListFilesTool
+from tools.command_tools import RunTestsTool
+from tools.file_tools import ListFilesTool, ReadFileTool
 from tools.registry import ToolRegistry
 
 
@@ -115,3 +116,82 @@ def test_full_loop_final_answer_without_any_tool_call(tmp_path):
     assert result == "I don't need to check any files to answer that."
     assert client._client.messages.create.call_count == 1
     assert context.observations == []
+
+
+# ---------------------------------------------------------------------------
+# Sprint 3: three different real tools, chosen autonomously round by round
+# ---------------------------------------------------------------------------
+
+def test_full_loop_across_three_different_tools_before_final_answer(tmp_path):
+    """Claude (mocked) chooses list_files, then read_file, then run_tests,
+    each in its own round, before answering. Proves: (1) AgentLoop needs no
+    per-tool branching to run three different real tools, and (2) call_id
+    pairing survives across every round, not just the first."""
+    (tmp_path / "agent_loop.py").write_text("# real-ish source for the demo")
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_agent_loop.py").write_text("def test_it():\n    assert True\n")
+
+    registry = ToolRegistry()
+    registry.register(ListFilesTool())
+    registry.register(ReadFileTool(root=str(tmp_path)))
+    registry.register(RunTestsTool(root=str(tmp_path)))
+
+    client = AnthropicClient.__new__(AnthropicClient)
+    client.model = DEFAULT_MODEL
+    client.tool_registry = registry
+    client._client = MagicMock()
+
+    responses = [
+        MagicMock(content=[make_tool_use_block(
+            "list_files", {"directory": str(tmp_path)}, "call_1")]),
+        MagicMock(content=[make_tool_use_block(
+            "read_file", {"path": "agent_loop.py"}, "call_2")]),
+        MagicMock(content=[make_tool_use_block(
+            "run_tests", {}, "call_3")]),
+        MagicMock(content=[make_text_block(
+            "Inspected agent_loop.py; its test suite passes.")]),
+    ]
+    client._client.messages.create.side_effect = responses
+
+    context = Context("Understand how AgentLoop works and verify its tests.")
+    loop = AgentLoop(client, registry, context)
+
+    result = loop.run()
+
+    assert result == "Inspected agent_loop.py; its test suite passes."
+    assert client._client.messages.create.call_count == 4
+
+    # Every round chose a different real tool, executed generically.
+    assert [obs["tool_name"] for obs in context.observations] == [
+        "list_files", "read_file", "run_tests",
+    ]
+    assert [obs["call_id"] for obs in context.observations] == [
+        "call_1", "call_2", "call_3",
+    ]
+    assert "agent_loop.py" in context.observations[0]["result"]
+    assert context.observations[1]["result"] == "# real-ish source for the demo"
+    assert "PASSED" in context.observations[2]["result"]
+
+    # The final request replays all three tool_use/tool_result pairs, in
+    # order, each keyed to its own call_id — not flattened, not dropped.
+    _, last_kwargs = client._client.messages.create.call_args_list[3]
+    messages = last_kwargs["messages"]
+    tool_use_ids = [
+        m["content"][0]["id"] for m in messages
+        if m["role"] == "assistant" and m["content"][0]["type"] == "tool_use"
+    ]
+    tool_result_ids = [
+        m["content"][0]["tool_use_id"] for m in messages
+        if m["role"] == "user" and isinstance(m["content"], list)
+        and m["content"][0]["type"] == "tool_result"
+    ]
+    assert tool_use_ids == ["call_1", "call_2", "call_3"]
+    assert tool_result_ids == ["call_1", "call_2", "call_3"]
+
+    # Claude was offered all three tool schemas on every round, sourced
+    # entirely from the registry.
+    for _, kwargs in client._client.messages.create.call_args_list:
+        assert [t["name"] for t in kwargs["tools"]] == [
+            "list_files", "read_file", "run_tests",
+        ]
