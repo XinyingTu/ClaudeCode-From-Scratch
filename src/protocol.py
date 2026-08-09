@@ -15,6 +15,14 @@ class FinalAnswer:
 
 @dataclass(frozen=True)
 class ToolCall:
-    """The LLM wants one tool executed before it continues."""
+    """The LLM wants one tool executed before it continues.
+
+    call_id is an opaque correlation id supplied by the provider adapter
+    (e.g. Anthropic's tool_use block id). AgentLoop passes it straight
+    through to Context so the result can be paired back to this exact
+    call. It defaults to None for callers that don't need pairing
+    (tests, simple providers).
+    """
     tool: str
     arguments: dict = field(default_factory=dict)
+    call_id: str | None = None

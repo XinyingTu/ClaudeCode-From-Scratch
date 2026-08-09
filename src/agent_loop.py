@@ -44,8 +44,14 @@ class AgentLoop:
                 result = tool.run(**response.arguments)
 
                 # Hand the result back to the context so the LLM can see it
-                # on the next turn.
-                self.context.add_tool_result(response.tool, result)
+                # on the next turn. call_id/arguments let Context replay this
+                # as a paired tool_use/tool_result when the provider needs it.
+                self.context.add_tool_result(
+                    response.tool,
+                    result,
+                    call_id=response.call_id,
+                    arguments=response.arguments,
+                )
 
             else:
                 raise ValueError(f"Unknown response type: {type(response).__name__!r}")

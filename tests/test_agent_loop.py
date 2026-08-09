@@ -13,8 +13,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from agent_loop import AgentLoop
+from context import Context
 from protocol import FinalAnswer, ToolCall
 from tools.base import BaseTool
+from tools.file_tools import ListFilesTool
 from tools.registry import ToolRegistry
 
 
@@ -43,7 +45,9 @@ class FakeContext:
     def __init__(self):
         self.tool_results: list[tuple[str, str]] = []
 
-    def add_tool_result(self, tool_name: str, result: str) -> None:
+    def add_tool_result(self, tool_name: str, result: str, call_id=None, arguments=None) -> None:
+        # call_id/arguments mirror the real Context.add_tool_result signature
+        # (see context.py); this fake only needs the (tool_name, result) pair.
         self.tool_results.append((tool_name, result))
 
 
@@ -170,3 +174,44 @@ def test_tool_arguments_default_to_empty_dict():
     loop = AgentLoop(llm, make_registry(GreetTool()), FakeContext())
     # GreetTool.run() defaults name to "world", so this should work fine.
     assert loop.run() == "ok"
+
+
+# ---------------------------------------------------------------------------
+# Sprint 2: real list_files ToolCall (with call_id) through a real Context
+# ---------------------------------------------------------------------------
+
+def test_list_files_tool_call_becomes_observation_with_call_id(tmp_path):
+    """A ToolCall carrying a call_id must execute through the real Registry
+    and be stored in the real Context as a pairable Observation."""
+    (tmp_path / "hello.txt").touch()
+
+    llm = FakeLLM([
+        ToolCall(
+            tool="list_files",
+            arguments={"directory": str(tmp_path)},
+            call_id="toolu_repo_01",
+        ),
+        FinalAnswer(content="This repository contains hello.txt."),
+    ])
+    context = Context("What files are in this repository?")
+    loop = AgentLoop(llm, make_registry(ListFilesTool()), context)
+
+    result = loop.run()
+
+    assert result == "This repository contains hello.txt."
+
+    # The tool actually ran (real ListFilesTool, real filesystem lookup).
+    assert len(context.observations) == 1
+    observation = context.observations[0]
+    assert observation["tool_name"] == "list_files"
+    assert observation["call_id"] == "toolu_repo_01"
+    assert "hello.txt" in observation["result"]
+
+    # And the next request would show Claude its own tool call paired
+    # with the result, not a flattened string.
+    messages = context.build_messages()
+    assert messages[1]["role"] == "assistant"
+    assert messages[1]["content"][0]["type"] == "tool_use"
+    assert messages[1]["content"][0]["id"] == "toolu_repo_01"
+    assert messages[2]["content"][0]["type"] == "tool_result"
+    assert messages[2]["content"][0]["tool_use_id"] == "toolu_repo_01"

@@ -177,25 +177,49 @@ ADR-005 is now implemented in code (Sprint 1.5).
        → AgentLoop returns FinalAnswer.content
    ```
 
-6. `ToolCall` is part of the internal protocol and is consumed by
-   `AgentLoop`, but `AnthropicClient.next()` cannot yet produce one —
-   real Anthropic tool-use translation is intentionally deferred to a
-   later sprint. `AnthropicClient` is therefore a partial adapter today:
-   correct for the shape it implements, incomplete for the protocol it
-   depends on.
+6. **(Sprint 2)** `AnthropicClient.next()` now produces both response
+   types. It sends a real `tools` schema (built from the injected
+   `ToolRegistry`, via each tool's `name` / `description` / `input_schema`)
+   so Claude — not our code — decides whether to answer directly or call
+   `list_files`. A `tool_use` content block in the response is translated
+   into `ToolCall(tool, arguments, call_id)`; otherwise the text blocks
+   become `FinalAnswer`, as before. `AgentLoop` is unchanged by this: it
+   still only branches on `isinstance(response, FinalAnswer | ToolCall)`.
 
-7. `Context.build_messages()` is sufficient for the current text-only,
-   no-tool-calls request shape. It has not yet been exercised against
-   real tool results, so it does not yet address how tool results should
-   be represented in Anthropic's native message format (e.g. `tool_result`
-   content blocks) versus the flattened string it produces today.
+7. **(Sprint 2)** `Context.build_messages()` now represents a tool
+   observation two ways, chosen by whether `call_id` is set:
+   - No `call_id` (e.g. tests that call `add_tool_result(name, result)`
+     directly): the original flattened `"[tool result]\n..."` string.
+   - `call_id` present (set by `AnthropicClient` from Claude's `tool_use`
+     block id, and threaded through by `AgentLoop`): an `assistant`
+     message replaying the exact `tool_use` block Claude sent, followed
+     by a `user` message with the matching `tool_result` block. This lets
+     Claude see its own prior tool call paired with the real result on
+     the next turn, instead of a made-up explanatory string.
+
+   `AgentLoop` never constructs either shape itself — it only forwards
+   `call_id`/`arguments` from the `ToolCall` it already has.
 
 ---
 
-## Next Challenge
+## Next Challenge (revised after Sprint 2)
 
-The FinalAnswer path is implemented end-to-end. The next challenge is
-extending `AnthropicClient` to translate Claude's real tool-use responses
-into `ToolCall`, and extending `Context.build_messages()` to represent
-tool results in the provider's native format on the request side — without
-leaking either shape into `AgentLoop`.
+The `ToolCall` ⇄ `FinalAnswer` round trip, including real tool execution
+and paired tool-use/tool-result replay, now works end-to-end for a single
+tool (`list_files`). This surfaced one tension worth tracking rather than
+solving now:
+
+`Context.build_messages()` directly emits Anthropic's own block vocabulary
+(`"type": "tool_use"`, `"tool_use_id"`, etc.) rather than a fully
+neutral internal shape translated by a separate adapter. This matches
+the "Reality Check" above — we deliberately kept the adapter thin and did
+not introduce a second translation layer for a single-provider project.
+If a second provider is ever added, `Context` would need either parallel
+build-methods per provider or a real internal event representation with
+per-provider adapters translating on the way out. Until multi-provider
+support is an actual requirement, this is intentional debt, not a bug.
+
+The next challenge, when it comes, is adding a second real tool
+(`read_file`) and seeing whether one `call_id`-keyed observation shape
+still holds, or whether provider-specific request assembly needs to move
+out of `Context` entirely.

@@ -30,6 +30,16 @@ def list_files(directory: str) -> list[str]:
 class ListFilesTool(BaseTool):
     name = "list_files"
     description = "List all non-hidden files inside a directory, recursively. Args: directory (str)"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "directory": {
+                "type": "string",
+                "description": "Path of the directory to list, relative or absolute.",
+            },
+        },
+        "required": [],
+    }
 
     def run(self, directory: str = ".") -> str:
         files = list_files(directory)

@@ -19,6 +19,10 @@ from llm_client import AnthropicClient
 from tools.registry import ToolRegistry
 
 if __name__ == "__main__":
+    # An empty registry is valid: AnthropicClient always requires a
+    # registry (it builds the `tools` schema from it), but a task that
+    # needs no tools just gets an empty tools list.
+    registry = ToolRegistry()
     context = Context("Hello! Briefly introduce yourself.")
-    loop = AgentLoop(AnthropicClient(), ToolRegistry(), context)
+    loop = AgentLoop(AnthropicClient(registry), registry, context)
     print(loop.run())
