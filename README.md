@@ -115,58 +115,102 @@ src/
 
 ## Roadmap
 
-ClaudeCode-From-Scratch
+## Roadmap
 
-Phase 1 — Agent Kernel
-├── Repository Discovery ✅
-├── Tool Registry ✅
-├── Agent Loop ✅
-├── Context ✅
-└── Internal Protocol ✅
+claude-code-from-scratch
 
-Phase 2 — Coding Runtime
-├── Real LLM Client ✅
-├── Tool Schema ✅
-├── list_files ✅
-├── read_file
-├── edit_file
-├── run_tests
-├── grep / glob / bash
-├── Tool errors as observations
-└── read → edit → test → retry
+### Phase 1 — Agent Kernel
 
-Phase 3 — Product Layer
-├── System Prompt
-├── CLI / REPL
-├── Configuration
-├── Session save / resume
-├── Permission / confirmation
-└── End-to-end coding demo
+- [x] Repository Discovery
+- [x] Tool Registry
+- [x] Agent Loop
+- [x] Context
+- [x] Structured Protocol (`FinalAnswer` / `ToolCall`)
+- [x] Real LLM integration
 
-Phase 4 — Memory & Context Intelligence
-├── Context compaction
-├── Task summary
-├── Repository memory
-├── Session memory
-├── Memory retrieval
-├── Memory scope / lifecycle
-└── Context vs Memory policy
+**Milestone:** a real LLM can reason through our own agent architecture.
 
-Phase 5 — Evaluation & Production Reliability
-├── Eval dataset / benchmark
-├── Task success rate
-├── Test pass rate
-├── Tool-call efficiency
-├── Latency / token / cost metrics
-├── Regression eval
-├── Failure taxonomy
-├── LLM-as-a-Judge where needed
-├── Tracing / observability
-├── Structured logging
-├── Retry / timeout / rate limits
-├── Error handling
-├── CI eval pipeline
-└── Production deployment
+---
+
+### Phase 2 — Coding Agent
+
+- [x] Tool schemas exposed to Claude
+- [x] `list_files`
+- [ ] `read_file`
+- [ ] `run_tests`
+- [ ] `edit_file`
+- [ ] `grep` / `glob`
+- [ ] Tool errors as observations
+- [ ] Multi-step `read → edit → test → retry` workflow
+
+**Milestone:** Claude can autonomously inspect, modify, and verify a codebase.
+
+---
+
+### Phase 3 — Usable Agent
+
+- [ ] System prompt
+- [ ] CLI / interactive session
+- [ ] Session save and resume
+- [ ] Context compaction
+- [ ] Safety confirmation for risky actions
+- [ ] End-to-end coding demo
+
+**Milestone:** turn the agent engine into a usable coding assistant.
+
+---
+
+### Phase 4 — Memory & Retrieval
+
+- [ ] Working context vs. persistent memory
+- [ ] Session / repository memory
+- [ ] Memory retrieval
+- [ ] Embeddings and semantic retrieval
+- [ ] Lightweight RAG for repository knowledge
+
+**Milestone:** the agent can retain and retrieve useful information across longer tasks.
+
+---
+
+### Phase 5 — Evaluation & Reliability
+
+- [ ] Coding-task eval set
+- [ ] End-to-end task success evaluation
+- [ ] Test / repair success rate
+- [ ] Tool-call and trajectory evaluation
+- [ ] Token, latency, and cost tracking
+- [ ] Regression evals
+- [ ] Basic tracing / observability
+- [ ] Retry, timeout, and failure handling
+
+**Milestone:** improvements to the agent become measurable instead of subjective.
+
+---
+
+### Phase 6 — Production
+
+- [ ] Configuration and secrets management
+- [ ] CI for tests and evals
+- [ ] Containerization
+- [ ] Cloud deployment
+- [ ] Production logging / monitoring
+
+**Milestone:** deploy and operate the agent as a real system.
+
+---
+
+## Learning Extensions
+
+These are explored only when they solve a real problem in the project:
+
+- Vector databases
+- LangGraph / graph orchestration
+- Advanced RAG
+- Model routing
+- Fine-tuning
+
+The goal is not to add technologies for their own sake, but to understand
+when and why they become useful.
 
 Advanced planning, reflection, sub-agents, and parallel tool execution are optional extensions, not baseline requirements.
 
